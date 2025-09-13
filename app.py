@@ -1,4 +1,4 @@
-# app.py
+
 
 import streamlit as st
 from transformers import pipeline
@@ -7,9 +7,7 @@ import random
 st.set_page_config(page_title="Emotion-Aware Diet Recommendation", layout="centered")
 st.title("🍽 Emotion-Aware Diet Recommendation System")
 
-# -------------------------------
-# 1️⃣ Load Emotion Detection Model
-# -------------------------------
+
 @st.cache_resource
 def load_emotion_model():
     return pipeline("text-classification", model="bhadresh-savani/bert-base-uncased-emotion")
@@ -22,19 +20,15 @@ def detect_emotion(user_text):
     score = result['score']
     return emotion, score
 
-# -------------------------------
-# 2️⃣ Load LLM for generating descriptions
-# -------------------------------
+
 @st.cache_resource
 def load_llm_model():
-    # Using Flan-T5 Base for better instruction-following
+    
     return pipeline("text2text-generation", model="google/flan-t5-base")
 
 llm_pipeline = load_llm_model()
 
-# -------------------------------
-# 3️⃣ Pre-defined meal database
-# -------------------------------
+
 meals_db = {
     "Indian": {
         "Weight Loss": ["Steamed Vegetable Dhokla", "Moong Dal Salad", "Grilled Paneer Skewers"],
@@ -58,9 +52,7 @@ meals_db = {
     }
 }
 
-# -------------------------------
-# 4️⃣ Pre-defined fallback templates per emotion
-# -------------------------------
+
 templates = {
     "sadness": [
         "Light and comforting, this meal can help lift your mood.",
@@ -99,9 +91,7 @@ templates = {
     ]
 }
 
-# -------------------------------
-# 5️⃣ Generate meals + emotion-aware descriptions
-# -------------------------------
+
 @st.cache_data
 def suggest_meals_hybrid(emotion, diet_goal, cuisine, num_meals=3):
     options = meals_db.get(cuisine, {}).get(diet_goal, ["Mixed Salad"])
@@ -124,7 +114,7 @@ Focus on emotional benefit and nutritional value. Avoid repetition.
                 eos_token_id=llm_pipeline.tokenizer.eos_token_id
             )[0]['generated_text'].strip()
             
-            # Fallback if the output is too short, empty, or repeats instructions
+            
             if len(description) < 10 or any(word in description.lower() for word in ["meal", "focus on", "avoid repetition"]):
                 description = random.choice(templates.get(emotion.lower(), ["Delicious and healthy meal."]))
         except:
@@ -134,9 +124,6 @@ Focus on emotional benefit and nutritional value. Avoid repetition.
         
     return meals_with_descriptions
 
-# -------------------------------
-# 6️⃣ Streamlit UI
-# -------------------------------
 user_input = st.text_area("How are you feeling today?", height=100)
 diet_goal = st.selectbox("Select your dietary goal:", ["Weight Loss", "Muscle Gain", "Balanced Diet"])
 cuisine = st.selectbox("Preferred cuisine:", ["Indian", "Italian", "Chinese", "Mexican"])
