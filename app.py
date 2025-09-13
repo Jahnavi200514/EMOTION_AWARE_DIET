@@ -43,7 +43,7 @@ templates = {
 
 # ---------------------- THEMEALDB API ----------------------
 def fetch_meals_from_api(cuisine, num_meals=3):
-    """Fetch meals dynamically from TheMealDB API by cuisine (area)."""
+    """Fetch meals dynamically with full details (name, image, instructions, ingredients)."""
     url = f"https://www.themealdb.com/api/json/v1/1/filter.php?a={cuisine}"
     response = requests.get(url)
 
@@ -51,7 +51,29 @@ def fetch_meals_from_api(cuisine, num_meals=3):
         data = response.json()
         meals = data.get("meals", [])
         if meals:
-            return random.sample(meals, min(num_meals, len(meals)))
+            selected_meals = random.sample(meals, min(num_meals, len(meals)))
+            detailed_meals = []
+
+            for meal in selected_meals:
+                meal_id = meal["idMeal"]
+                detail_url = f"https://www.themealdb.com/api/json/v1/1/lookup.php?i={meal_id}"
+                detail_res = requests.get(detail_url).json()
+
+                if detail_res["meals"]:
+                    meal_detail = detail_res["meals"][0]
+
+                    # Collect ingredients + measures
+                    ingredients = []
+                    for i in range(1, 21):  # MealDB provides up to 20 ingredients
+                        ing = meal_detail.get(f"strIngredient{i}")
+                        measure = meal_detail.get(f"strMeasure{i}")
+                        if ing and ing.strip() != "" and measure and measure.strip() != "":
+                            ingredients.append(f"{measure.strip()} {ing.strip()}")
+
+                    meal_detail["ingredients"] = ingredients
+                    detailed_meals.append(meal_detail)
+
+            return detailed_meals
     return []
 
 
@@ -63,8 +85,8 @@ def suggest_meals_hybrid(emotion, cuisine, num_meals=3):
 
     for meal in meals:
         meal_name = meal["strMeal"]
-        meal_img = meal["strMealThumb"]
 
+        # Generate description
         prompt = f"""
 Meal: {meal_name}
 Write **one short, engaging sentence** explaining why this meal is good for someone feeling {emotion}.
@@ -85,7 +107,8 @@ Focus on emotional benefit and nutritional value. Avoid repetition.
         except:
             description = random.choice(templates.get(emotion.lower(), ["Delicious and healthy meal."]))
 
-        meals_with_descriptions.append((meal_name, meal_img, description))
+        meal["description"] = description
+        meals_with_descriptions.append(meal)
 
     return meals_with_descriptions
 
@@ -105,7 +128,21 @@ if st.button("Get Meal Recommendations"):
         st.success(f"**Detected Emotion:** {emotion} ({score:.2f})")
         st.subheader("🍲 Recommended Meals:")
 
-        for idx, (meal, img, description) in enumerate(meal_suggestions, 1):
-            st.markdown(f"**{idx}. {meal}**")
-            st.image(img, width=250)
-            st.markdown(f"👉 {description}\n")
+        for idx, meal in enumerate(meal_suggestions, 1):
+            st.markdown(f"### {idx}. {meal['strMeal']}")
+            st.image(meal['strMealThumb'], width=300)
+
+            # Emotion-aware description
+            st.markdown(f"👉 {meal.get('description', 'A tasty and nutritious meal!')}")
+
+            # Ingredients
+            if "ingredients" in meal and meal["ingredients"]:
+                st.markdown("**📝 Ingredients:**")
+                cols = st.columns(2)
+                for i, ing in enumerate(meal["ingredients"]):
+                    cols[i % 2].markdown(f"- {ing}")
+
+            # Instructions
+            st.markdown("**📖 Instructions:**")
+            st.markdown(meal["strInstructions"])
+            st.markdown("---")
